@@ -47,7 +47,8 @@ GET /index.json
 ```
 
 Fetch `/index.json` directly. Do not serve it from a long-lived cache; the manifest is the
-mutable pointer.
+mutable pointer. Counts in the example are illustrative; read the actual values from the
+manifest.
 
 ## 2. Download and verify all three shards
 
@@ -174,4 +175,5 @@ Assets are content-addressed. A link is a copy/hardlink, not a download.
 The shards contain metadata and official URLs. They do not contain game files. The host
 serving `index.json` or the shards is not a game CDN; game downloads go to the official URLs
 stored in the catalog and assets shards.
+
 

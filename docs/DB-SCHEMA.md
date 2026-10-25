@@ -6,10 +6,12 @@ files and no JSON columns.
 ```text
 index.json
   shards[]:
-    catalog.idx   32,817,152 B
-    launch.idx    25,436,160 B
-    assets.idx    10,952,704 B
+    catalog.idx
+    launch.idx
+    assets.idx
 ```
+
+Shard sizes depend on the metadata set; the manifest carries the size and SHA-256 for each.
 
 ## Shard split
 
@@ -219,3 +221,4 @@ manifest written. The verifier opens all three read-only with `PRAGMA temp_store
 
 No shard exceeds 100 MB. No compression is used. If future growth exceeds 100 MB per shard,
 split at a stable boundary (for example, files vs plans) and extend the manifest.
+

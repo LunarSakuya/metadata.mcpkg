@@ -1,125 +1,135 @@
-# Relay Index — SQLite index
+# Relay Index — SQLite metadata index
 
-> **Independent project. Not an official Minecraft product. Not affiliated with or
-> endorsed by Mojang or Microsoft. Metadata only. No game files. No authentication
-> bypass. No piracy. Read [LEGAL.md](LEGAL.md).**
+> Independent project. Not an official Minecraft product. Not affiliated with or endorsed by
+> Mojang or Microsoft. Metadata only. No game files, no authentication bypass, no piracy.
+> Read [LEGAL.md](LEGAL.md).
 
-This repository contains the generator, verifier and Action for a sharded SQLite Minecraft
-metadata index. **The generated databases are not stored in the main branch.**
+Relay Index turns Mojang's public version metadata into a small set of SQLite databases plus
+one JSON manifest. Launchers and downloaders read the manifest, verify the shards, and query
+the databases for versions, files, launch arguments and assets.
 
-## Branch model
+The generated databases are not stored in `main`.
+
+## Branches
 
 ```text
-main   code, scripts, site seed, docs, legal — no database
-site   generated page tree, force-pushed by the Action; GitHub Pages serves it:
-       index.json
-       data/<bundle-sha256>/catalog.idx
-       data/<bundle-sha256>/launch.idx
-       data/<bundle-sha256>/assets.idx
-       index.html / 404.html / .nojekyll / optional CNAME
+main   source, workflow, site seed, docs
+site   generated manifest, three SQLite shards and the static page
 ```
 
-Every run replaces the `site` branch with a single-commit orphan tree. The main branch and
-the page branch do not accumulate generated database history.
+`site` is a single-commit orphan branch, force-pushed by the Action. GitHub Pages serves it.
 
-## Action schedule
+## Action
+
+Runs daily at:
 
 ```text
 02:35 Asia/Shanghai (18:35 UTC)
 ```
 
-The workflow is public-repository scheduled and also supports manual dispatch. If GitHub
-delays the schedule, the next run simply replaces the page branch.
-
-## What the Action does
+Manual runs are available through `workflow_dispatch`.
 
 ```text
 checkout main
-setup .NET 10.0.x
-scripts/update-db.ps1
-  → fetch official metadata with 4 workers, 5 attempts with jitter and SHA-1 validation
-  → build one full SQLite DB in a transaction
-  → close/flush, then split into catalog.idx, launch.idx, assets.idx
-  → hash each shard, verify all three read-only
-scripts/prepare-db-site.ps1
-  → copy site seed and shards to a temporary directory outside main
-  → content-address the shard directory by a combined SHA-256
-  → rewrite manifest shard paths
-scripts/publish-site.ps1
-  → orphan single-commit page tree
-  → git push --force origin HEAD:site
-GitHub Pages
-  → build and deploy the site branch
-  → optional verify of /index.json when PAGES_CNAME is set
+setup .NET 10
+restore metadata cache
+update-db.ps1
+prepare-db-site.ps1
+publish-site.ps1        # force-push site
+verify published JSON   # when PAGES_CNAME is set
 ```
 
-No prebuilt database is committed to this release folder or to main. The update script takes
-an atomic cache lock and cleans a stale lock only when its recorded PID is gone.
+`update-db.ps1` fetches metadata with four workers, five attempts per request, and SHA-1
+verification. It builds the databases in a transaction, splits them into three shards, and
+verifies the result before publication.
 
-GitHub Pages uses **Source: Deploy from a branch**, branch `site`, folder `/`. The workflow
-only force-pushes that branch; GitHub Pages builds and deploys it. The optional verify step
-polls `/index.json` for up to 5 minutes when `PAGES_CNAME` is set.
+`prepare-db-site.ps1` copies the verified shards into a content-addressed directory and
+renders the page timestamp, counts and shard sizes.
 
-Repository variables:
+`publish-site.ps1` force-pushes the page branch. GitHub Pages builds and deploys it.
+
+When `PAGES_CNAME` is set, the workflow polls `/index.json` for up to 30 attempts at 10-second
+intervals (5 minutes) and compares `sourceManifestSha256` and every shard SHA-256 with the
+local manifest.
+
+## GitHub Pages
 
 ```text
-PAGES_CNAME        custom domain; empty means no active CNAME
-DISPLAY_TIME_ZONE  local zone for the page timestamp; empty means UTC
+Source: Deploy from a branch
+Branch: site
+Folder: / (root)
 ```
 
-Optional secret:
+Custom domain is optional; set it to the same hostname as `PAGES_CNAME`.
+
+Point DNS directly at GitHub Pages:
 
 ```text
-RELAY_PUSH_TOKEN   fine-grained PAT, Contents: Read and write
+data.example.com  CNAME  <owner>.github.io
 ```
 
-The generated page shows the build time in UTC and in the configured local zone, plus
-version/plan/asset counts and shard sizes.
+No proxy is required. Enable Enforce HTTPS in the Pages settings.
 
-## Current generated shape
-
-When built from the current metadata cache:
+### Repository variables
 
 ```text
-versions        920
-client plans    6,440
-server plans    853
-asset documents 58
-catalog.idx     32,817,152 bytes
-launch.idx      25,436,160 bytes
-assets.idx      10,952,704 bytes
-verify checks   1,934,426
+PAGES_CNAME        custom domain, for example data.example.com
+DISPLAY_TIME_ZONE  IANA zone for the page timestamp, for example Asia/Shanghai
 ```
 
-Each shard is under 100 MB. Shard hashes are deterministic for identical metadata; the
-manifest `generatedAt` may change.
+If `PAGES_CNAME` is empty, no active CNAME is written and the verification step is skipped.
+If `DISPLAY_TIME_ZONE` is empty, the page uses UTC.
+
+### Optional secret
+
+```text
+RELAY_PUSH_TOKEN   fine-grained PAT with Contents: Read and write
+```
+
+The default `GITHUB_TOKEN` is used when the secret is absent. Set the PAT only if branch
+protection blocks the default token from pushing `site`.
+
+## Manifest and shards
+
+`/index.json` lists three shards:
+
+```text
+catalog.idx   versions, plans, files, contents, natives, extraction rules
+launch.idx    classpath, directories, launch arguments
+assets.idx    asset documents, objects, links
+```
+
+Each entry has an id, relative path, SHA-256, byte size and database `user_version`.
+
+Shard paths are content-addressed:
+
+```text
+/data/<bundle-sha256>/catalog.idx
+/data/<bundle-sha256>/launch.idx
+/data/<bundle-sha256>/assets.idx
+```
+
+A new build writes a new directory. `index.json` is the mutable pointer.
 
 ## Client
 
 1. Fetch `/index.json`.
-2. Read `shards[]`: `catalog`, `launch`, `assets`.
-3. Download each `urls` entry (content-addressed path).
-4. Verify each shard's `size` and SHA-256.
-5. Open `catalog.idx` read-only with SQLite 3.37+.
-6. `ATTACH` `launch.idx` and `assets.idx`.
-7. Query `catalog.versions`, `catalog.plans`, `catalog.v_file_urls`,
-   `assets.v_asset_objects`, `assets.asset_links`, `launch.plan_classpath`,
-   `launch.plan_directories`, `launch.launch_args`.
+2. Download every `shards[].urls` entry.
+3. Verify each file's size and SHA-256.
+4. Open `catalog.idx` read-only with SQLite 3.37 or newer.
+5. `ATTACH` `launch.idx` and `assets.idx`.
 
-See [docs/DB-CLIENT.md](docs/DB-CLIENT.md) and [docs/DB-SCHEMA.md](docs/DB-SCHEMA.md).
+```sql
+ATTACH 'launch.idx' AS launch;
+ATTACH 'assets.idx' AS assets;
+```
 
-## SQLite policy
-
-Used: `STRICT`, `WITHOUT ROWID`, one generated asset path, `application_id`,
-`user_version`, `CHECK`, foreign keys, plain views.
-
-Not used: JSON columns, JSON1, `PRAGMA optimize`, `VACUUM`.
-
-Compatibility floor: SQLite 3.37 (2021). Older 3.x versions are not a target.
+See [docs/DB-CLIENT.md](docs/DB-CLIENT.md) for queries and failure handling, and
+[docs/DB-SCHEMA.md](docs/DB-SCHEMA.md) for tables and invariants.
 
 ## Metadata ceilings
 
-The ceilings are named parameters/constants, not scattered magic numbers:
+The limits are named parameters or constants:
 
 ```text
 MaxVersions        1,000,000
@@ -132,48 +142,54 @@ MaxAssetObjects    1,000,000
 MaxFiles           1,000,000
 ```
 
-`update-db.ps1` exposes the download limits as parameters; the C# readers use named
-`MetadataAudit`, `VersionParser` and `MojangResolver` constants. Manifest bytes are capped
-by `MaxManifestBytes`.
+`update-db.ps1` exposes the download limits as parameters. The C# readers use named constants
+in `MetadataAudit`, `VersionParser` and `MojangResolver`.
 
-No cross-shard foreign keys. Cross-shard consistency is checked by `Relay.DbVerify`.
+## SQLite
+
+Used: `STRICT`, `WITHOUT ROWID`, one generated asset path, `application_id`, `user_version`,
+`CHECK`, foreign keys and plain views.
+
+Not used: JSON columns, JSON1, `PRAGMA optimize`, `VACUUM`.
+
+The compatibility floor is SQLite 3.37.
+
+There are no cross-shard foreign keys. `Relay.DbVerify` checks cross-shard consistency.
 
 ## Page caching
 
-GitHub Pages controls `Cache-Control`; the repository cannot set per-path TTLs. GitHub Pages
-ignores `_headers` and `_redirects`, so this repository does not include them.
+GitHub Pages controls `Cache-Control`. The repository cannot set per-path TTLs, and GitHub
+Pages ignores `_headers` and `_redirects`.
 
-Shard paths are content-addressed. A new build gets a new path, so the manifest never points
-at a reused shard. The manifest itself is small and is fetched from the same host.
+Shard paths are content-addressed, so a new build never reuses an old shard path. The manifest
+is small and is fetched from the same host.
 
-## Fork-friendly
+## Run locally
 
-There is no hardcoded owner, repository, domain, branch, or path. The page branch is
-`site`, the domain comes from the `PAGES_CNAME` repository variable, and git operations use
-the repository that contains the workflow. A fork can run the same workflow unchanged.
+Requirements: .NET 10 SDK and PowerShell 7.
 
-## Files
-
-```text
-src/Relay.Core/           metadata parser and resolver
-src/Relay.Db/             full schema, shard schemas, generator
-src/Relay.DbVerify/       cross-shard verifier
-scripts/update-db.ps1     fetch, build, split, verify, atomic swap
-scripts/prepare-db-site.ps1
-scripts/publish-site.ps1
-site/                     page seed, no database
-docs/                     schema, client, deployment
-.github/workflows/relay-db.yml
-LEGAL.md  SECURITY.md  LICENSE  global.json
+```powershell
+pwsh ./scripts/update-db.ps1 -CacheRoot .cache -OutputRoot out
+pwsh ./scripts/prepare-db-site.ps1 -Source out -Site ./site-out
 ```
 
-No `legal/` directory, no mirrored EULA text, no `bin/obj/out`, no generated database.
+`update-db.ps1` downloads only metadata. It does not download game files, libraries, assets or
+server jars.
 
+## Project layout
 
+```text
+src/Relay.Core/             metadata parser and resolver
+src/Relay.Db/               schema, shard split and generator
+src/Relay.DbVerify/         read-only verifier
+scripts/update-db.ps1       fetch, build, split and verify
+scripts/prepare-db-site.ps1 page tree and manifest paths
+scripts/publish-site.ps1    force-push the page branch
+site/                       page seed with timestamp/count placeholders
+docs/                       schema, client protocol, deployment
+.github/workflows/relay-db.yml
+```
 
+## License and legal
 
-
-
-
-
-
+See [LICENSE](LICENSE) and [LEGAL.md](LEGAL.md).

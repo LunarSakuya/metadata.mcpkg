@@ -64,7 +64,7 @@ publish-site.ps1
   → orphan single-commit tree
   → git push --force origin HEAD:site
 verify
-  → poll https://$PAGES_CNAME/index.json for up to 5 minutes
+  → poll https://$PAGES_CNAME/index.json: 30 attempts, 10 seconds apart (5 minutes)
   → compare sourceManifestSha256 and every shard SHA-256
 ```
 
@@ -134,21 +134,13 @@ content-addressed, so a new build never reuses an old shard path.
 
 ## Size and limits
 
-Current shards:
-
-```text
-catalog.idx   32,817,152 B
-launch.idx    25,436,160 B
-assets.idx    10,952,704 B
-```
-
 | Limit | Value |
 |---|---:|
 | Git single file | about 100 MB |
 | GitHub Pages site | about 1 GB |
 
-Each shard is below the Git limit. If a shard approaches 100 MB, split at a stable boundary
-and extend the manifest `shards[]` list.
+Shard sizes depend on the metadata set. If a shard approaches 100 MB, split at a stable
+boundary and extend the manifest `shards[]` list.
 
 ## Atomicity and rollback
 
@@ -176,3 +168,4 @@ the site branch.
 The default `GITHUB_TOKEN` with `permissions: contents: write` can push `site`. If branch
 protection blocks it, set `RELAY_PUSH_TOKEN` as a fine-grained PAT with
 **Contents: Read and write** on this repository.
+
