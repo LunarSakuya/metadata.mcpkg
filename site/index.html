@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Relay Index — SQLite</title>
+</head>
+<body>
+  <h1>Relay Index — SQLite</h1>
+  <p>Minecraft metadata index. One manifest and three SQLite shards.</p>
+
+  <h2>Last update</h2>
+  <p>UTC: <time datetime="{{UPDATED_ISO}}">{{UPDATED_UTC}}</time></p>
+  <p>Local: {{UPDATED_LOCAL}} ({{DISPLAY_TIME_ZONE}})</p>
+
+  <h2>Index</h2>
+  <ul>
+    <li><a href="index.json">/index.json</a> — shard names, SHA-256, sizes, counts</li>
+    <li><a href="data/{{BUNDLE_SHA}}/catalog.idx">catalog.idx</a> — versions, plans, files, content</li>
+    <li><a href="data/{{BUNDLE_SHA}}/launch.idx">launch.idx</a> — classpath, directories, launch args</li>
+    <li><a href="data/{{BUNDLE_SHA}}/assets.idx">assets.idx</a> — asset documents, objects, links</li>
+  </ul>
+
+  <h2>Counts</h2>
+  <ul>
+    <li>Versions: {{COUNT_VERSIONS}}</li>
+    <li>Client plans: {{COUNT_CLIENT_PLANS}}</li>
+    <li>Server plans: {{COUNT_SERVER_PLANS}}</li>
+    <li>Asset documents: {{COUNT_ASSET_DOCS}}</li>
+  </ul>
+
+  <h2>Shards</h2>
+  <ul>
+    <li>catalog.idx: {{SIZE_CATALOG}}</li>
+    <li>launch.idx: {{SIZE_LAUNCH}}</li>
+    <li>assets.idx: {{SIZE_ASSETS}}</li>
+  </ul>
+
+  <p>No game files, accounts, credentials, authentication bypass, or piracy. The shards
+  point to official Mojang download URLs.</p>
+  <p><strong>Independent project. Not an official Minecraft product. Not affiliated with,
+  endorsed by, or approved by Mojang or Microsoft. Metadata only. See the repository's
+  LEGAL.md; not legal advice.</strong></p>
+</body>
+</html>
+

@@ -1,0 +1,87 @@
+name: relay-db
+
+# 02:35 Asia/Shanghai = 18:35 UTC. Public repository; scheduled workflows are
+# supported. Keep workflow_dispatch for manual runs.
+on:
+  schedule:
+    - cron: '35 18 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: relay-db
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELAY_PUSH_TOKEN || github.token }}
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore metadata cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .cache
+          key: relay-metadata-v1-${{ github.run_id }}
+          restore-keys: |
+            relay-metadata-v1-
+
+      - name: Fetch metadata, build and verify SQLite index
+        shell: pwsh
+        run: |
+          ./scripts/update-db.ps1 `
+            -CacheRoot .cache `
+            -OutputRoot out
+
+      - name: Prepare page tree outside the main repository
+        shell: pwsh
+        env:
+          PAGES_CNAME: ${{ vars.PAGES_CNAME }}
+          DISPLAY_TIME_ZONE: ${{ vars.DISPLAY_TIME_ZONE }}
+        run: |
+          $site = Join-Path $env:RUNNER_TEMP 'relay-site'
+          ./scripts/prepare-db-site.ps1 -Source out -Site $site
+          "SITE_PATH=$site" >> $env:GITHUB_ENV
+
+      - name: Force-push page branch
+        shell: pwsh
+        run: |
+          ./scripts/publish-site.ps1 -Site $env:SITE_PATH -Branch site
+
+      - name: Verify published manifest
+        if: ${{ vars.PAGES_CNAME != '' }}
+        shell: pwsh
+        env:
+          PAGES_CNAME: ${{ vars.PAGES_CNAME }}
+        run: |
+          $expected = Get-Content out/index.json -Raw | ConvertFrom-Json
+          $base = 'https://' + $env:PAGES_CNAME.Trim().TrimEnd('/')
+          for ($attempt = 1; $attempt -le 30; $attempt++) {
+              $uri = "$base/index.json?verify=$env:GITHUB_RUN_ID&attempt=$attempt"
+              try {
+                  $response = Invoke-WebRequest -Uri $uri -TimeoutSec 30 -Headers @{ 'Cache-Control' = 'no-cache' }
+                  $actual = $response.Content | ConvertFrom-Json
+                  $expectedHashes = @($expected.shards | ForEach-Object { [string]$_.sha256 })
+                  $actualHashes = @($actual.shards | ForEach-Object { [string]$_.sha256 })
+                  if ($actual.sourceManifestSha256 -eq $expected.sourceManifestSha256 -and
+                      (($actualHashes -join ',') -eq ($expectedHashes -join ','))) {
+                      Write-Host "published manifest verified: $uri"
+                      exit 0
+                  }
+              }
+              catch { Write-Host "waiting for Pages: $($_.Exception.Message)" }
+              if ($attempt -lt 30) { Start-Sleep -Seconds 10 }
+          }
+          throw "Page manifest did not converge after 30 attempts"
