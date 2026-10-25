@@ -164,8 +164,9 @@ try {
 
         $versionResults = $versionItems | ForEach-Object -Parallel {
             $item = $_
+            $versionLimit = $using:MaxVersionBytes
             if (Test-Path -LiteralPath $item.Path -PathType Leaf) {
-                if ((Get-Item -LiteralPath $item.Path).Length -le $MaxVersionBytes -and
+                if ((Get-Item -LiteralPath $item.Path).Length -le $versionLimit -and
                     (Get-FileHash -LiteralPath $item.Path -Algorithm SHA1).Hash.ToLowerInvariant() -eq $item.Sha1) {
                     return [pscustomobject]@{ Id = $item.Id; Ok = $true; Error = $null }
                 }
@@ -176,7 +177,7 @@ try {
                     $temporary = $item.Path + '.tmp-' + $PID + '-' + [guid]::NewGuid().ToString('N')
                     try {
                         Invoke-WebRequest -Uri $item.Url -OutFile $temporary -MaximumRedirection 0 -TimeoutSec 60 -ErrorAction Stop
-                        if ((Get-Item -LiteralPath $temporary).Length -gt $MaxVersionBytes) { throw 'version document too large' }
+                        if ((Get-Item -LiteralPath $temporary).Length -gt $versionLimit) { throw 'version document too large' }
                         if ((Get-FileHash -LiteralPath $temporary -Algorithm SHA1).Hash.ToLowerInvariant() -ne $item.Sha1) { throw 'SHA-1 mismatch' }
                         Move-Item -LiteralPath $temporary -Destination $item.Path -Force
                         return [pscustomobject]@{ Id = $item.Id; Ok = $true; Error = $null }
@@ -220,8 +221,9 @@ try {
         if ($indexItems.Count -gt $MaxAssetIndexes) { throw "too many distinct asset indexes: $($indexItems.Count)" }
         $indexResults = $indexItems.Values | ForEach-Object -Parallel {
             $item = $_
+            $indexLimit = $using:MaxIndexBytes
             if (Test-Path -LiteralPath $item.Path -PathType Leaf) {
-                if ((Get-Item -LiteralPath $item.Path).Length -le $MaxIndexBytes -and
+                if ((Get-Item -LiteralPath $item.Path).Length -le $indexLimit -and
                     (Get-FileHash -LiteralPath $item.Path -Algorithm SHA1).Hash.ToLowerInvariant() -eq $item.Sha1) {
                     return [pscustomobject]@{ Sha1 = $item.Sha1; Ok = $true; Error = $null }
                 }
@@ -232,7 +234,7 @@ try {
                     $temporary = $item.Path + '.tmp-' + $PID + '-' + [guid]::NewGuid().ToString('N')
                     try {
                         Invoke-WebRequest -Uri $item.Url -OutFile $temporary -MaximumRedirection 0 -TimeoutSec 60 -ErrorAction Stop
-                        if ((Get-Item -LiteralPath $temporary).Length -gt $MaxIndexBytes) { throw 'asset index too large' }
+                        if ((Get-Item -LiteralPath $temporary).Length -gt $indexLimit) { throw 'asset index too large' }
                         if ((Get-FileHash -LiteralPath $temporary -Algorithm SHA1).Hash.ToLowerInvariant() -ne $item.Sha1) { throw 'SHA-1 mismatch' }
                         Move-Item -LiteralPath $temporary -Destination $item.Path -Force
                         return [pscustomobject]@{ Sha1 = $item.Sha1; Ok = $true; Error = $null }
@@ -307,6 +309,7 @@ try {
 finally {
     if (Test-Path -LiteralPath $lockDir) { Remove-Item -LiteralPath $lockDir -Recurse -Force -ErrorAction SilentlyContinue }
 }
+
 
 
 

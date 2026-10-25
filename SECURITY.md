@@ -66,8 +66,8 @@ integrity and supply-chain provenance, not confidentiality or browser exclusion.
 - `PAGES_CNAME` is an optional repository variable; only then is an active CNAME created.
 - `DISPLAY_TIME_ZONE` is an optional repository variable for the local time shown on the
   generated page. Without it, the page uses UTC.
-- Pin GitHub Action versions to commit SHAs and keep `site`/`main` branch protection
-  compatible with the bot.
+- Pin GitHub Actions to major versions (`@v5`) and keep `site`/`main` branch protection
+  compatible with the bot. Minor releases carry fixes and security updates.
 - The client must verify each shard size and SHA-256 from `index.json` before opening it.
   When the static host is not trusted, the client can verify an optional Ed25519 signature
   over `index.json` and the shard hashes.
@@ -78,6 +78,7 @@ Do not open a public issue containing exploit details. Use the repository's priv
 vulnerability reporting if enabled; otherwise contact the maintainer through a private
 channel. Include the affected endpoint/field, a minimal reproduction, and impact. Do not
 include tokens or personal data.
+
 
 
 
