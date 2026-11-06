@@ -1,0 +1,47 @@
+{
+  "schema": 2,
+  "format": "sqlite-shards",
+  "generatedAt": "2026-11-06T23:25:45Z",
+  "latestRelease": "26.3",
+  "latestSnapshot": "26.4-snapshot-7",
+  "shards": [
+    {
+      "id": "catalog",
+      "path": "data/e68a24f02ba2b5b0d52fd49c2c573b73b31cc8e9288faf8284815c8a0ed5a914/catalog.idx",
+      "sha256": "545b0df3a95d6525d6ada899ed746bcc3f7342e81be3065ee0959d5d5896ace0",
+      "size": 32935936,
+      "userVersion": 1,
+      "urls": [
+        "data/e68a24f02ba2b5b0d52fd49c2c573b73b31cc8e9288faf8284815c8a0ed5a914/catalog.idx"
+      ]
+    },
+    {
+      "id": "launch",
+      "path": "data/e68a24f02ba2b5b0d52fd49c2c573b73b31cc8e9288faf8284815c8a0ed5a914/launch.idx",
+      "sha256": "ebf638d26a85cf8467e142c7669344dfc0b3922732fa4a5bdfef7b3655166cc9",
+      "size": 25542656,
+      "userVersion": 1,
+      "urls": [
+        "data/e68a24f02ba2b5b0d52fd49c2c573b73b31cc8e9288faf8284815c8a0ed5a914/launch.idx"
+      ]
+    },
+    {
+      "id": "assets",
+      "path": "data/e68a24f02ba2b5b0d52fd49c2c573b73b31cc8e9288faf8284815c8a0ed5a914/assets.idx",
+      "sha256": "5e26540ff10e14bed421b322471541d20d2f29e950d697e777b8ae1530faf04d",
+      "size": 10952704,
+      "userVersion": 1,
+      "urls": [
+        "data/e68a24f02ba2b5b0d52fd49c2c573b73b31cc8e9288faf8284815c8a0ed5a914/assets.idx"
+      ]
+    }
+  ],
+  "counts": {
+    "versions": 922,
+    "clientPlans": 6454,
+    "serverPlans": 855,
+    "assetDocs": 58
+  },
+  "sourceManifestSha256": "0fcdf26b9cfeececdffee692ffd7dbfc4306c7260d1ab6c17de3798dfc64c2c4"
+}
+
